@@ -1,0 +1,18 @@
+# Build output
+backend/target/
+frontend/dist/
+frontend/node_modules/
+
+# Uploaded documents and local data
+backend/data/
+data/
+
+# Local configuration and secrets
+.env
+*.local
+
+# Tooling
+.idea/
+*.iml
+.vscode/
+.DS_Store

@@ -1,0 +1,74 @@
+spring:
+  application:
+    name: nyayaflow
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/nyayaflow}
+    username: ${DB_USERNAME:nyayaflow}
+    password: ${DB_PASSWORD:nyayaflow}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_batch_fetch_size: 50
+        # No jdbc.time_zone: system timestamps are TIMESTAMPTZ instants, and hearing times are court
+        # wall-clock values that must be stored exactly as entered, whatever the server's time zone.
+  flyway:
+    enabled: true
+  servlet:
+    multipart:
+      max-file-size: ${NYAYAFLOW_MAX_UPLOAD_SIZE:20MB}
+      # Room for the form fields sent along with a file of the maximum size.
+      max-request-size: ${NYAYAFLOW_MAX_REQUEST_SIZE:21MB}
+  jackson:
+    default-property-inclusion: always
+    deserialization:
+      # Jackson 3 rejects absent primitive fields by default; an omitted boolean flag means false.
+      fail-on-null-for-primitives: false
+
+server:
+  port: ${PORT:8080}
+  tomcat:
+    # Read past an over-limit upload so a client that keeps sending still receives the 413 response
+    # instead of a reset connection.
+    max-swallow-size: 25MB
+  error:
+    include-stacktrace: never
+    include-message: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+nyayaflow:
+  # Wall-clock zone of the courts. Hearing times are stored as court-local times.
+  timezone: ${NYAYAFLOW_TIMEZONE:Asia/Kolkata}
+  security:
+    jwt:
+      # Base64 or plain text, at least 32 bytes. Leave empty in development to generate a random
+      # key at startup (all tokens are invalidated on restart).
+      secret: ${NYAYAFLOW_JWT_SECRET:}
+      ttl: ${NYAYAFLOW_JWT_TTL:8h}
+    login:
+      max-failed-attempts: 5
+      lockout-duration: 5m
+    cors:
+      allowed-origins: ${NYAYAFLOW_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  storage:
+    location: ${NYAYAFLOW_STORAGE_LOCATION:./data/uploads}
+    allowed-extensions: pdf,doc,docx,odt,rtf,txt,jpg,jpeg,png
+  scheduling:
+    court-day-start: "09:30"
+    court-day-end: "17:30"
+    default-hearing-minutes: 30
+  deadlines:
+    reminder-days-ahead: 3
+  seed:
+    # Populates a realistic demo dataset when the database has no users.
+    enabled: ${NYAYAFLOW_SEED_DEMO_DATA:true}

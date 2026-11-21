@@ -1,0 +1,11 @@
+nyayaflow:
+  seed:
+    enabled: false
+  security:
+    jwt:
+      secret: test-secret-for-integration-tests-0123456789
+  storage:
+    location: ${java.io.tmpdir}/nyayaflow-test-uploads
+logging:
+  level:
+    root: WARN
