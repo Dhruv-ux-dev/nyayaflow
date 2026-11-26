@@ -2,6 +2,8 @@
 
 **Court case lifecycle management for registries, benches and the bar.**
 
+**[Live demo](https://nyayaflow-lsm2.onrender.com)** · sign in with the one-click demo accounts (password `Demo@123`). Hosted on a free plan, so the first request after a quiet spell can take about a minute while the server wakes up.
+
 ![Java 25](https://img.shields.io/badge/Java-25-b07219)
 ![Spring Boot 4.1](https://img.shields.io/badge/Spring%20Boot-4.1-6db33f)
 ![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-336791)
