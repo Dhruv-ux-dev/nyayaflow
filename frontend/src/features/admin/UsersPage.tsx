@@ -1,18 +1,23 @@
-import { KeyRound, MoreHorizontal, Pencil, Search, UserCheck, UserPlus, UserX, Users } from 'lucide-react'
-import { useState } from 'react'
+import { Gavel, KeyRound, MoreHorizontal, Pencil, Scale, ShieldCheck, UserCheck, UserPlus, UserX, Users, type LucideIcon } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
+import { useSearchParams } from 'react-router'
 
 import { useCourts, useCreateUser, useResetPassword, useSetUserActive, useUpdateUser, useUsers } from '@/api/admin'
+import { useCounts } from '@/api/insights'
 import { useCurrentUser } from '@/auth/AuthContext'
+import { homeCrumb } from '@/components/layout/navigation'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog, FormDialog } from '@/components/ui/dialog'
 import { EmptyState, ErrorState, InlineAlert, SkeletonRows } from '@/components/ui/feedback'
 import { Field, Input, Select } from '@/components/ui/form'
+import { Skeleton } from '@/components/ui/feedback'
 import { Menu, MenuItem, MenuSeparator } from '@/components/ui/menu'
 import { Pagination } from '@/components/ui/pagination'
-import { PageHeader } from '@/components/ui/panel'
+import { ListSheet, PageHeader } from '@/components/ui/panel'
+import { FilterBar, SearchInput } from '@/components/ui/segmented'
 import { Table, TD, TH, THead, TR } from '@/components/ui/table'
 import { cn } from '@/lib/cn'
 import { applyServerErrors, requiredText } from '@/lib/forms'
@@ -23,13 +28,28 @@ import type { Role, User } from '@/lib/types'
 
 const PASSWORD_RULE = { value: /^(?=.*[A-Za-z])(?=.*\d).{8,100}$/, message: 'Use 8 or more characters with a letter and a number' }
 
+const roleMeta: Record<Role, { icon: LucideIcon; tone: string }> = {
+  JUDGE: { icon: Gavel, tone: 'bg-seal-soft text-seal' },
+  LAWYER: { icon: Scale, tone: 'bg-brand-soft text-brand' },
+  STAFF: { icon: Users, tone: 'bg-teal-soft text-teal' },
+  ADMIN: { icon: ShieldCheck, tone: 'bg-sunken text-ink' },
+}
+const ROLES: Role[] = ['JUDGE', 'LAWYER', 'STAFF', 'ADMIN']
+
 export default function UsersPage() {
   useDocumentTitle('Users')
   const me = useCurrentUser()
+  const [params, setParams] = useSearchParams()
   const [search, setSearch] = useState('')
-  const [role, setRole] = useState<Role | ''>('')
-  const [status, setStatus] = useState<'active' | 'inactive' | ''>('')
+  const [role, setRole] = useState<Role | ''>(() => (ROLES.includes(params.get('role') as Role) ? (params.get('role') as Role) : ''))
+  const [status, setStatus] = useState<'active' | 'inactive' | ''>(() =>
+    params.get('status') === 'inactive' ? 'inactive' : params.get('status') === 'active' ? 'active' : '',
+  )
   const [page, setPage] = useState(0)
+  const roleCounts = useCounts(
+    '/users',
+    ROLES.map((r) => ({ key: r, query: { role: r, active: true } })),
+  )
   const q = useDebounced(search, 300)
   const { data, isLoading, error, refetch, isFetching } = useUsers({
     q: q || undefined,
@@ -42,38 +62,109 @@ export default function UsersPage() {
   const setActive = useSetUserActive()
   const close = (open: boolean) => !open && setDialog(null)
 
+  // "Add user" links (e.g. from the overview) arrive as ?new=1.
+  useEffect(() => {
+    if (params.get('new') === '1') {
+      setDialog({ kind: 'create' })
+      const next = new URLSearchParams(params)
+      next.delete('new')
+      setParams(next, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   return (
     <>
       <PageHeader
+        breadcrumbs={[homeCrumb(me.role), { label: 'Users' }]}
+        eyebrow="People"
         title="Users"
         description="Accounts for judges, counsel, registry staff and administrators."
         actions={
-          <Button variant="primary" onClick={() => setDialog({ kind: 'create' })}>
+          <Button variant="role" onClick={() => setDialog({ kind: 'create' })}>
             <UserPlus />
             Add user
           </Button>
         }
       />
-      <div className="rounded-lg border border-line bg-surface">
-        <div className="flex flex-wrap items-center gap-2 border-b border-line p-3 sm:p-4">
-          <div className="relative min-w-56 flex-1">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" aria-hidden="true" />
-            <Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(0) }} placeholder="Name, email or bar number" aria-label="Search users" className="pl-9" />
-          </div>
-          <Select value={role} onChange={(e) => { setRole(e.target.value as Role | ''); setPage(0) }} aria-label="Filter by role" className="w-44">
-            <option value="">All roles</option>
-            {options(roleLabels).map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </Select>
-          <Select value={status} onChange={(e) => { setStatus(e.target.value as 'active' | 'inactive' | ''); setPage(0) }} aria-label="Filter by status" className="w-40">
-            <option value="">Any status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Deactivated</option>
-          </Select>
-        </div>
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {ROLES.map((r) => {
+          const meta = roleMeta[r]
+          const selected = role === r
+          return (
+            <button
+              key={r}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => {
+                setRole(selected ? '' : r)
+                setPage(0)
+              }}
+              className={cn(
+                'flex items-center gap-3 rounded-xl border bg-surface px-4 py-3 text-left shadow-raised transition-[border-color,box-shadow]',
+                selected ? 'border-role ring-2 ring-role/15' : 'border-line hover:border-line-strong',
+              )}
+            >
+              <span className={cn('grid size-10 shrink-0 place-items-center rounded-lg', meta.tone)}>
+                <meta.icon className="size-[18px]" aria-hidden="true" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[13px] text-muted">{roleLabels[r]}s</span>
+                {roleCounts.counts.get(r) === undefined ? (
+                  <Skeleton className="mt-1 h-6 w-8" />
+                ) : (
+                  <span className="tabular block text-xl font-semibold text-ink">{roleCounts.counts.get(r)}</span>
+                )}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      <ListSheet
+        toolbar={
+          <FilterBar>
+            <SearchInput
+              value={search}
+              onChange={(value) => {
+                setSearch(value)
+                setPage(0)
+              }}
+              placeholder="Name, email or bar number"
+              label="Search users"
+              className="min-w-56"
+            />
+            <Select
+              value={role}
+              onChange={(e) => {
+                setRole(e.target.value as Role | '')
+                setPage(0)
+              }}
+              aria-label="Filter by role"
+              className="w-44"
+            >
+              <option value="">All roles</option>
+              {options(roleLabels).map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
+            <Select
+              value={status}
+              onChange={(e) => {
+                setStatus(e.target.value as 'active' | 'inactive' | '')
+                setPage(0)
+              }}
+              aria-label="Filter by status"
+              className="w-40"
+            >
+              <option value="">Any status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Deactivated</option>
+            </Select>
+          </FilterBar>
+        }
+      >
         {isLoading && <SkeletonRows />}
         {error && <ErrorState error={error} onRetry={() => refetch()} />}
         {data && data.content.length === 0 && <EmptyState icon={Users} title="No users match" />}
@@ -94,7 +185,7 @@ export default function UsersPage() {
               </THead>
               <tbody>
                 {data.content.map((user) => (
-                  <TR key={user.id}>
+                  <TR key={user.id} className={cn('hover:bg-ivory', !user.active && 'opacity-70')}>
                     <TD>
                       <span className="flex items-center gap-3">
                         <Avatar name={user.fullName} role={user.role} size="sm" />
@@ -113,7 +204,17 @@ export default function UsersPage() {
                     </TD>
                     <TD className="text-sm text-ink-soft">{user.court?.name ?? user.barRegistrationNumber ?? '—'}</TD>
                     <TD className="text-sm whitespace-nowrap text-ink-soft">{user.lastLoginAt ? timeAgo(user.lastLoginAt) : 'Never'}</TD>
-                    <TD>{user.active ? <Badge tone="success" dot>Active</Badge> : <Badge tone="neutral" dot>Deactivated</Badge>}</TD>
+                    <TD>
+                      {user.active ? (
+                        <Badge tone="success" dot>
+                          Active
+                        </Badge>
+                      ) : (
+                        <Badge tone="neutral" dot>
+                          Deactivated
+                        </Badge>
+                      )}
+                    </TD>
                     <TD className="text-right">
                       <Menu
                         trigger={
@@ -155,7 +256,7 @@ export default function UsersPage() {
             <Pagination page={data} onChange={setPage} noun="users" />
           </div>
         )}
-      </div>
+      </ListSheet>
 
       {dialog?.kind === 'create' && <UserDialog open onOpenChange={close} />}
       {dialog?.kind === 'edit' && <UserDialog user={dialog.user} open onOpenChange={close} />}
@@ -167,8 +268,8 @@ export default function UsersPage() {
           title="Deactivate account"
           description={
             <>
-              {dialog.user.fullName} will be signed out immediately and will not be able to sign in. Their name stays on the cases and
-              records they are part of. Judges with pending cases must have them reassigned first.
+              {dialog.user.fullName} will be signed out immediately and will not be able to sign in. Their name stays on the cases and records they
+              are part of. Judges with pending cases must have them reassigned first.
             </>
           }
           confirmLabel="Deactivate"
@@ -197,7 +298,13 @@ function UserDialog({ user, open, onOpenChange }: { user?: User; open: boolean; 
   const update = useUpdateUser()
   const { data: courts } = useCourts()
   const [error, setError] = useState<string | null>(null)
-  const { register, handleSubmit, control, setError: setFieldError, formState } = useForm<UserForm>({
+  const {
+    register,
+    handleSubmit,
+    control,
+    setError: setFieldError,
+    formState,
+  } = useForm<UserForm>({
     defaultValues: {
       fullName: user?.fullName ?? '',
       email: user?.email ?? '',
@@ -236,7 +343,11 @@ function UserDialog({ user, open, onOpenChange }: { user?: User; open: boolean; 
       open={open}
       onOpenChange={onOpenChange}
       title={user ? `Edit ${user.fullName}` : 'Add a user'}
-      description={user ? 'Changing the role signs the person out so they start a fresh session.' : 'Share the temporary password securely; they can change it from their profile.'}
+      description={
+        user
+          ? 'Changing the role signs the person out so they start a fresh session.'
+          : 'Share the temporary password securely; they can change it from their profile.'
+      }
       submitLabel={user ? 'Save account' : 'Create account'}
       submitting={create.isPending || update.isPending}
       onSubmit={submit}
@@ -266,7 +377,13 @@ function UserDialog({ user, open, onOpenChange }: { user?: User; open: boolean; 
         </Field>
         {role === 'LAWYER' && (
           <Field label="Bar registration number" required error={formState.errors.barRegistrationNumber?.message}>
-            {(field) => <Input {...field} placeholder="MH/1123/2009" {...register('barRegistrationNumber', requiredText('Lawyers need a bar registration number'))} />}
+            {(field) => (
+              <Input
+                {...field}
+                placeholder="MH/1123/2009"
+                {...register('barRegistrationNumber', requiredText('Lawyers need a bar registration number'))}
+              />
+            )}
           </Field>
         )}
         {(role === 'JUDGE' || role === 'STAFF') && (
@@ -287,8 +404,20 @@ function UserDialog({ user, open, onOpenChange }: { user?: User; open: boolean; 
           {(field) => <Input {...field} type="tel" {...register('phone')} />}
         </Field>
         {!user && (
-          <Field label="Temporary password" required error={formState.errors.password?.message} hint="8 or more characters with a letter and a number.">
-            {(field) => <Input {...field} type="text" autoComplete="off" {...register('password', { required: 'Set a temporary password', pattern: PASSWORD_RULE })} />}
+          <Field
+            label="Temporary password"
+            required
+            error={formState.errors.password?.message}
+            hint="8 or more characters with a letter and a number."
+          >
+            {(field) => (
+              <Input
+                {...field}
+                type="text"
+                autoComplete="off"
+                {...register('password', { required: 'Set a temporary password', pattern: PASSWORD_RULE })}
+              />
+            )}
           </Field>
         )}
       </div>
@@ -322,7 +451,9 @@ function ResetPasswordDialog({ user, open, onOpenChange }: { user: User; open: b
     >
       {error && <InlineAlert>{error}</InlineAlert>}
       <Field label="New password" required error={formState.errors.newPassword?.message}>
-        {(field) => <Input {...field} type="text" autoComplete="off" {...register('newPassword', { required: 'Enter a password', pattern: PASSWORD_RULE })} />}
+        {(field) => (
+          <Input {...field} type="text" autoComplete="off" {...register('newPassword', { required: 'Enter a password', pattern: PASSWORD_RULE })} />
+        )}
       </Field>
     </FormDialog>
   )

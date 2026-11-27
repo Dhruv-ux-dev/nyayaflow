@@ -58,14 +58,14 @@ export function FormDialog({
   onSubmit,
   submitLabel,
   submitting,
-  submitVariant = 'primary',
+  submitVariant = 'role',
   children,
   ...props
 }: Omit<DialogProps, 'footer'> & {
   onSubmit: () => void
   submitLabel: string
   submitting?: boolean
-  submitVariant?: 'primary' | 'danger'
+  submitVariant?: 'role' | 'primary' | 'danger'
 }) {
   const formId = useId()
   return (
@@ -103,7 +103,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel,
-  tone = 'primary',
+  tone = 'role',
   loading,
   onConfirm,
 }: {
@@ -112,7 +112,7 @@ export function ConfirmDialog({
   title: string
   description: ReactNode
   confirmLabel: string
-  tone?: 'primary' | 'danger'
+  tone?: 'role' | 'primary' | 'danger'
   loading?: boolean
   onConfirm: () => void
 }) {

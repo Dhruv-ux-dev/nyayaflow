@@ -4,6 +4,8 @@ import { toast } from 'sonner'
 
 import { useAction } from '@/api/mutation'
 import { useAuth, useCurrentUser } from '@/auth/AuthContext'
+import { homeCrumb, workspaces } from '@/components/layout/navigation'
+import { Badge } from '@/components/ui/badge'
 import { Avatar } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { InlineAlert } from '@/components/ui/feedback'
@@ -22,28 +24,32 @@ export default function ProfilePage() {
   useDocumentTitle('Profile')
   const user = useCurrentUser()
   return (
-    <div className="mx-auto max-w-3xl">
-      <PageHeader title="Profile" description="Your account details and password." />
-      <div className="space-y-6">
-        <Panel title="Account" bodyClassName="p-4">
-          <div className="mb-5 flex items-center gap-3">
-            <Avatar name={user.fullName} role={user.role} />
-            <div>
-              <p className="font-medium text-ink">{user.fullName}</p>
-              <p className="text-sm text-muted">{user.designation ?? roleLabels[user.role]}</p>
+    <div className="mx-auto max-w-5xl">
+      <PageHeader breadcrumbs={[homeCrumb(user.role), { label: 'Profile' }]} title="Profile" description="Your account details and password." />
+      <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
+        <aside className="self-start overflow-hidden rounded-xl border border-line bg-surface shadow-raised">
+          <div className="h-16 bg-role" aria-hidden="true" />
+          <div className="-mt-8 px-5 pb-5">
+            <Avatar name={user.fullName} role={user.role} size="lg" className="ring-4 ring-surface" />
+            <p className="mt-3 font-serif text-xl leading-tight font-medium text-ink">{user.fullName}</p>
+            <p className="text-sm text-muted">{user.designation ?? roleLabels[user.role]}</p>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              <Badge tone="neutral">{roleLabels[user.role]}</Badge>
+              <Badge tone="info">{workspaces[user.role].name}</Badge>
             </div>
+            <dl className="mt-5 space-y-3.5 border-t border-line pt-4">
+              <Detail label="Email (sign-in)">{user.email}</Detail>
+              {user.court && <Detail label="Court">{user.court.name}</Detail>}
+              {user.barRegistrationNumber && <Detail label="Bar registration">{user.barRegistrationNumber}</Detail>}
+              <Detail label="Last sign-in">{formatDateTime(user.lastLoginAt)}</Detail>
+            </dl>
+            <p className="mt-4 text-xs text-muted">Your email, role and court are managed by an administrator.</p>
           </div>
-          <dl className="grid gap-4 sm:grid-cols-2">
-            <Detail label="Email (sign-in)">{user.email}</Detail>
-            <Detail label="Role">{roleLabels[user.role]}</Detail>
-            {user.court && <Detail label="Court">{user.court.name}</Detail>}
-            {user.barRegistrationNumber && <Detail label="Bar registration">{user.barRegistrationNumber}</Detail>}
-            <Detail label="Last sign-in">{formatDateTime(user.lastLoginAt)}</Detail>
-          </dl>
-          <p className="mt-4 text-xs text-muted">Your email, role and court are managed by an administrator.</p>
-        </Panel>
-        <ProfileForm user={user} />
-        <PasswordForm />
+        </aside>
+        <div className="min-w-0 space-y-6">
+          <ProfileForm user={user} />
+          <PasswordForm />
+        </div>
       </div>
     </div>
   )
@@ -53,7 +59,12 @@ function ProfileForm({ user }: { user: User }) {
   const { setUser } = useAuth()
   const [error, setError] = useState<string | null>(null)
   const save = useAction((values: { fullName: string; phone?: string }) => api.put<User>('/auth/me', values), { success: 'Profile saved' })
-  const { register, handleSubmit, setError: setFieldError, formState } = useForm({ defaultValues: { fullName: user.fullName, phone: user.phone ?? '' } })
+  const {
+    register,
+    handleSubmit,
+    setError: setFieldError,
+    formState,
+  } = useForm({ defaultValues: { fullName: user.fullName, phone: user.phone ?? '' } })
   const submit = handleSubmit(async (values) => {
     setError(null)
     try {
@@ -64,7 +75,7 @@ function ProfileForm({ user }: { user: User }) {
   })
   return (
     <Panel title="Contact details">
-      <form onSubmit={submit} noValidate className="space-y-4 p-4">
+      <form onSubmit={submit} noValidate className="space-y-4 p-5">
         {error && <InlineAlert>{error}</InlineAlert>}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Full name" required error={formState.errors.fullName?.message}>
@@ -75,7 +86,7 @@ function ProfileForm({ user }: { user: User }) {
           </Field>
         </div>
         <div className="flex justify-end">
-          <Button type="submit" variant="primary" loading={save.isPending}>
+          <Button type="submit" variant="role" loading={save.isPending}>
             Save details
           </Button>
         </div>
@@ -88,7 +99,14 @@ function PasswordForm() {
   const { acceptSession } = useAuth()
   const [error, setError] = useState<string | null>(null)
   const change = useAction((values: { currentPassword: string; newPassword: string }) => api.put<LoginResponse>('/auth/me/password', values))
-  const { register, handleSubmit, reset, watch, setError: setFieldError, formState } = useForm({
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    setError: setFieldError,
+    formState,
+  } = useForm({
     defaultValues: { currentPassword: '', newPassword: '', confirm: '' },
   })
   const submit = handleSubmit(async (values) => {
@@ -104,10 +122,17 @@ function PasswordForm() {
   })
   return (
     <Panel title="Change password" description="At least 8 characters, with a letter and a number.">
-      <form onSubmit={submit} noValidate className="space-y-4 p-4">
+      <form onSubmit={submit} noValidate className="space-y-4 p-5">
         {error && <InlineAlert>{error}</InlineAlert>}
         <Field label="Current password" required error={formState.errors.currentPassword?.message}>
-          {(field) => <Input {...field} type="password" autoComplete="current-password" {...register('currentPassword', { required: 'Enter your current password' })} />}
+          {(field) => (
+            <Input
+              {...field}
+              type="password"
+              autoComplete="current-password"
+              {...register('currentPassword', { required: 'Enter your current password' })}
+            />
+          )}
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="New password" required error={formState.errors.newPassword?.message}>
@@ -135,7 +160,7 @@ function PasswordForm() {
           </Field>
         </div>
         <div className="flex justify-end">
-          <Button type="submit" variant="primary" loading={change.isPending}>
+          <Button type="submit" variant="role" loading={change.isPending}>
             Change password
           </Button>
         </div>

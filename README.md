@@ -54,18 +54,20 @@ sees only what it needs.
 
 ## Screenshots
 
-Each role works in its own workspace, with its own colour, navigation and dashboard.
+Each role works in its own workspace: its own layout, navigation, accent colour and dashboard.
 
 | | |
 |---|---|
-| ![Sign-in page with one-click demo accounts](docs/screenshots/01-sign-in.png) | ![Case register with search and filters](docs/screenshots/03-case-register.png) |
-| **Sign in.** One-click demo accounts for each role. | **Case register.** Search, filters and sorting across every case. |
-| ![Case detail with lifecycle strip and tabs](docs/screenshots/04-case-detail.png) | ![Calendar of hearings](docs/screenshots/05-calendar.png) |
-| **Case detail.** Lifecycle strip, next hearing, parties and per-role actions. | **Calendar.** Hearings by day, with outcome-pending listings flagged. |
-| ![Judge's chambers dashboard](docs/screenshots/06-judge-chambers.png) | ![Judge's cause list](docs/screenshots/07-cause-list.png) |
-| **Chambers (judge).** Today's board, reserved judgments, pending outcomes. | **Cause list (judge).** Upcoming listings on the judge's board. |
+| ![Sign-in page with one-click demo accounts](docs/screenshots/01-sign-in.png) | ![Administrator's system overview](docs/screenshots/10-admin-overview.png) |
+| **Sign in.** Show/hide password, validation and one-click demo workspaces. | **System console (administrator).** Trends, court performance, role mix, alerts and audit events. |
+| ![Registry desk with filing queue](docs/screenshots/02-registry-dashboard.png) | ![Case register with search and filters](docs/screenshots/03-case-register.png) |
+| **Registry desk (staff).** Quick actions, filing queue with next actions, today's cause list. | **Case register.** Status views with counts, search, filters, sorting and paging. |
+| ![Case workspace with lifecycle strip and tabs](docs/screenshots/04-case-detail.png) | ![Calendar of hearings](docs/screenshots/05-calendar.png) |
+| **Case workspace.** Header facts, lifecycle strip, eight tabs and a summary rail. | **Calendar.** Month grid with a day cause list; outcome-pending listings flagged. |
+| ![Judge's board](docs/screenshots/06-judge-chambers.png) | ![Judge's cause list](docs/screenshots/07-cause-list.png) |
+| **Chambers (judge).** A sidebar-free bench view centred on today's board. | **Cause list.** Listings by day and courtroom, printable. |
 | ![Lawyer's counsel desk dashboard](docs/screenshots/08-counsel-desk.png) | ![Administrator's user management](docs/screenshots/09-admin-users.png) |
-| **Counsel desk (lawyer).** Matters, deadlines and recent orders. | **Administration.** Users, roles, courts and the activity log. |
+| **Counsel desk (lawyer).** Next appearance, what is overdue, matters, filings and orders. | **Users.** Role tiles, search and account actions. |
 
 ## The problem
 
@@ -94,9 +96,10 @@ Filed → Under review → Active ⇄ Awaiting decision → Disposed → Closed
   counsel and judge; filters by status, type, priority, judge, court, "has a hearing listed" and
   "without a judge"; sorting by filing date, next hearing, last update or title; pagination; and
   every filter kept in the URL so views can be bookmarked and shared.
-- A case page organised into Overview, Hearings, Proceedings, Documents, Orders, Deadlines,
-  Timeline and Activity, headed by a **lifecycle strip** showing each stage the case has reached
-  and the date it got there.
+- A case workspace organised into Overview, Parties & counsel, Hearings (with the order sheet of
+  proceedings), Timeline, Documents, Orders & judgments, Deadlines and Activity, headed by the case
+  facts and a **lifecycle strip** showing each stage the case has reached and the date it got
+  there, with a summary rail (next hearing, open deadlines, latest order, counsel) beside every tab.
 - Lifecycle rules enforced by the server: only valid transitions, and only by the right role
   (registry admits and closes; the presiding judge reserves and pronounces judgment).
 - Optimistic concurrency on case edits, so two clerks cannot silently overwrite each other.
@@ -129,11 +132,27 @@ Filed → Under review → Active ⇄ Awaiting decision → Disposed → Closed
 - An audit trail of every significant action (including sign-ins and failed sign-ins), shown per
   case and as a searchable system-wide activity log for administrators.
 
-**Dashboards**
-- Role-specific dashboards: the court-wide picture for administrators (institution vs disposal over
-  12 months, pending cases per judge, cases by status and type); today's cause list, pending
-  outcomes, allocation queue and hearing load for staff; the judge's board and reserved judgments;
-  the lawyer's upcoming hearings, deadlines and recent orders.
+**Dashboards and workspaces**
+- Each role has a different shell and home page, not just a different colour:
+  - **Administrator — system console.** Dark sidebar; registration and disposal trends, case
+    distribution by status, court performance (pending, decided, disposal share, hearings this week),
+    pending cases per judge, users by role, pending administrative work, system alerts derived from
+    live records, audit events and recent registrations.
+  - **Court staff — registry desk.** Light working sidebar with *Register case*; quick actions
+    (register, review filing, schedule hearing, assign judge, upload documents, prepare cause list),
+    a filing queue of cases still with the registry with the next action for each, today's cause
+    list, outcomes to record, deadlines, listing load and recently filed documents.
+  - **Judge — chambers.** No sidebar; a quiet top navigation and today's board with time,
+    courtroom, parties, counsel, hearing state and progress (or the next sitting when nothing is
+    listed today), judgments reserved, outcomes and orders pending, assigned cases and recently
+    opened cases.
+  - **Lawyer — counsel desk.** Next appearance, overdue work and unread notices first; then active
+    matters, hearings this week, a 7-day strip, critical deadlines, document submissions, received
+    orders and notifications.
+- Every figure is a live count from the API and links to the list it was counted from.
+- Quick actions that need a case open a case picker, then the right form on that case's page
+  (`/cases/{id}?action=schedule|assign|order|upload|deadline|conclude`), only if the server's
+  permissions allow it.
 - A command palette (`Ctrl K` / `⌘K` or `/`) to jump to any case from anywhere.
 
 ## Roles and what they can do
@@ -152,8 +171,8 @@ Filed → Under review → Active ⇄ Awaiting decision → Disposed → Closed
 | Manage users, courts and courtrooms; activity log | ✓ | | | |
 
 Each role signs in to its own workspace (Administration, Registry, Chambers or Counsel desk) with
-its own accent colour, navigation and page names, and a dashboard that opens with a summary of that
-person's figures. Every rule is enforced by the API. The UI uses a `permissions` object that the server computes for
+its own layout, accent colour, navigation and page names, and a dashboard built around that
+person's work. Every rule is enforced by the API. The UI uses a `permissions` object that the server computes for
 each case and user, so buttons are only shown when the action would succeed, but hiding a button is
 never the protection.
 
@@ -495,6 +514,8 @@ Court hours (`09:30–17:30`), the default hearing length and the reminder windo
 - Clash detection works on fixed time slots. Real cause lists often list many matters in the same
   courtroom at the same time; a production system would model sessions rather than slots.
 - No dark mode, internationalisation or Hindi/regional-language interface.
+- "Recently opened" cases on the judge's board are remembered in the browser only, because the API
+  does not record case views.
 
 ## Future improvements
 
