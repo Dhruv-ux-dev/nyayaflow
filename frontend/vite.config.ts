@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       // The browser talks to the same origin; Vite forwards API calls to Spring Boot.
-      proxy: { '/api': { target: env.VITE_API_PROXY_TARGET || 'http://localhost:8080' } },
+      proxy: { '/api': { target: env.VITE_API_PROXY_TARGET || 'http://localhost:8080', changeOrigin: true } },
     },
   }
 })

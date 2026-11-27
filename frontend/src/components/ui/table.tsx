@@ -11,15 +11,15 @@ export function Table({ children, className }: { children: ReactNode; className?
 }
 
 export function THead({ children }: { children: ReactNode }) {
-  return <thead className="border-b border-line bg-paper/70 text-left">{children}</thead>
+  return <thead className="border-b border-line bg-ivory text-left">{children}</thead>
 }
 
 export function TH({ className, ...props }: ThHTMLAttributes<HTMLTableCellElement>) {
-  return <th scope="col" className={cn('px-4 py-2.5 text-xs font-medium whitespace-nowrap text-muted', className)} {...props} />
+  return <th scope="col" className={cn('eyebrow px-4 py-2.5 whitespace-nowrap text-faint', className)} {...props} />
 }
 
 export function TR({ className, ...props }: HTMLAttributes<HTMLTableRowElement>) {
-  return <tr className={cn('border-b border-line last:border-b-0', className)} {...props} />
+  return <tr className={cn('border-b border-line transition-colors last:border-b-0', className)} {...props} />
 }
 
 export function TD({ className, ...props }: TdHTMLAttributes<HTMLTableCellElement>) {

@@ -15,7 +15,7 @@ export function DocumentsTab({ courtCase, query }: { courtCase: CaseDetail; quer
   if (query.error) return <ErrorState error={query.error} onRetry={() => query.refetch()} />
   const documents = query.data ?? []
   const upload = courtCase.permissions.canUploadDocument && (
-    <Button size="sm" variant="primary" onClick={() => open({ kind: 'upload' })}>
+    <Button size="sm" variant="role" onClick={() => open({ kind: 'upload' })}>
       <FilePlus2 />
       Upload document
     </Button>

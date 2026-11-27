@@ -8,7 +8,7 @@ export const TabsContent = RadixTabs.Content
 
 export function TabsList({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <RadixTabs.List className={cn('flex gap-1 overflow-x-auto border-b border-line [scrollbar-width:none]', className)}>
+    <RadixTabs.List className={cn('scrollbar-none flex gap-0.5 overflow-x-auto border-b border-line', className)}>
       {children}
     </RadixTabs.List>
   )
@@ -19,8 +19,8 @@ export function TabsTrigger({ value, children, count }: { value: string; childre
     <RadixTabs.Trigger
       value={value}
       className={cn(
-        '-mb-px inline-flex h-10 items-center gap-1.5 border-b-2 border-transparent px-3 text-sm font-medium whitespace-nowrap text-muted',
-        'transition-colors hover:text-ink data-[state=active]:border-ink data-[state=active]:text-ink',
+        '-mb-px inline-flex h-11 items-center gap-1.5 border-b-2 border-transparent px-3 text-sm font-medium whitespace-nowrap text-muted',
+        'transition-colors hover:text-ink data-[state=active]:border-role data-[state=active]:text-ink',
       )}
     >
       {children}

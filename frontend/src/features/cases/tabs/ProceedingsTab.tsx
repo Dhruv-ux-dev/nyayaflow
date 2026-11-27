@@ -17,7 +17,7 @@ export function ProceedingsTab({ courtCase, query }: { courtCase: CaseDetail; qu
   if (query.error) return <ErrorState error={query.error} onRetry={() => query.refetch()} />
   const proceedings = query.data ?? []
   const recordButton = courtCase.permissions.canRecordProceeding && (
-    <Button size="sm" variant="primary" onClick={() => open({ kind: 'proceeding' })}>
+    <Button size="sm" variant="role" onClick={() => open({ kind: 'proceeding' })}>
       <NotebookPen />
       Record proceedings
     </Button>

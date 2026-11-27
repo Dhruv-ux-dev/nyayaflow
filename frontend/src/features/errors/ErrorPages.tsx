@@ -13,7 +13,7 @@ export function NotFoundPage() {
       title="This page does not exist"
       description="The link may be mistyped, or the page may have moved."
       action={
-        <Button asChild variant="primary">
+        <Button asChild variant="role">
           <Link to="/">Go to dashboard</Link>
         </Button>
       }

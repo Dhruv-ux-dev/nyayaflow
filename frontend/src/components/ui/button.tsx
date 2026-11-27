@@ -6,9 +6,12 @@ import { cn } from '@/lib/cn'
 import { Spinner } from './feedback'
 
 const variants = {
-  primary: 'bg-brand text-white shadow-[inset_0_-1px_0_rgb(0_0_0/0.12)] hover:bg-brand-strong',
-  secondary: 'bg-surface text-ink border border-line-strong hover:bg-sunken hover:border-faint/60',
+  primary: 'bg-brand text-white shadow-[inset_0_-1px_0_rgb(0_0_0/0.14),0_1px_2px_rgb(15_27_45/0.12)] hover:bg-brand-strong',
+  /** The workspace accent: teal for the registry, burgundy for chambers, and so on. */
+  role: 'bg-role text-white shadow-[inset_0_-1px_0_rgb(0_0_0/0.16),0_1px_2px_rgb(15_27_45/0.12)] hover:bg-role-strong',
+  secondary: 'bg-surface text-ink border border-line-strong shadow-[0_1px_1px_rgb(15_27_45/0.04)] hover:bg-ivory hover:border-faint/60',
   ghost: 'text-ink-soft hover:bg-sunken hover:text-ink',
+  quiet: 'bg-sunken text-ink hover:bg-line',
   danger: 'bg-danger text-white hover:bg-[#a42a22]',
   'danger-ghost': 'text-danger hover:bg-danger-soft',
 } as const
@@ -34,7 +37,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   ref,
 ) {
   const classes = cn(
-    'inline-flex shrink-0 items-center rounded-md font-medium whitespace-nowrap transition-colors',
+    'inline-flex shrink-0 items-center rounded-md font-medium whitespace-nowrap transition-[color,background-color,border-color,box-shadow] duration-150',
     'disabled:pointer-events-none disabled:opacity-55 [&_svg]:size-4 [&_svg]:shrink-0',
     variants[variant],
     sizes[size],

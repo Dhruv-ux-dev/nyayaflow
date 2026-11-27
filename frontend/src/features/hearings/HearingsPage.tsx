@@ -1,5 +1,5 @@
 import { addDays, format, subDays } from 'date-fns'
-import { CalendarDays, Gavel, Search } from 'lucide-react'
+import { CalendarDays, Gavel, Printer } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 
@@ -9,16 +9,18 @@ import { useCurrentUser } from '@/auth/AuthContext'
 import { can } from '@/auth/roles'
 import { HearingStatusBadge } from '@/components/domain/badges'
 import { CaseNumber, CaseTitle } from '@/components/domain/CaseTitle'
-import { pageLabel } from '@/components/layout/navigation'
+import { useCounts } from '@/api/insights'
+import { homeCrumb, pageLabel } from '@/components/layout/navigation'
 import { Button } from '@/components/ui/button'
 import { EmptyState, ErrorState, SkeletonRows } from '@/components/ui/feedback'
-import { Input, Select } from '@/components/ui/form'
+import { Select } from '@/components/ui/form'
 import { MultiSelect } from '@/components/ui/MultiSelect'
 import { Pagination } from '@/components/ui/pagination'
-import { PageHeader } from '@/components/ui/panel'
+import { ListSheet, PageHeader } from '@/components/ui/panel'
+import { FilterBar, SearchInput, SegmentedTabs } from '@/components/ui/segmented'
 import { CauseList } from '@/features/dashboard/CauseList'
 import { cn } from '@/lib/cn'
-import { formatTime, formatWeekday, relativeDay } from '@/lib/format'
+import { formatDate, formatTime, formatWeekday, relativeDay } from '@/lib/format'
 import { useDebounced, useDocumentTitle } from '@/lib/hooks'
 import { hearingStatusLabels, hearingTypeLabels, options } from '@/lib/labels'
 import type { Hearing, HearingStatus, HearingType } from '@/lib/types'
@@ -83,6 +85,13 @@ export default function HearingsPage() {
   const { data, isLoading, error, refetch, isFetching } = useHearings(query)
   const now = new Date()
   const hearings = (data?.content ?? []).filter((h) => range !== 'pending' || new Date(h.scheduledAt) < now)
+  const rangeCounts = useCounts(
+    '/hearings',
+    (['today', 'week', 'upcoming'] as Range[]).map((key) => {
+      const base = rangeQuery(key)
+      return { key, query: { from: base.from, to: base.to, status: base.status } }
+    }),
+  )
 
   const selectRange = (key: Range) => {
     setPage(0)
@@ -93,85 +102,130 @@ export default function HearingsPage() {
   return (
     <>
       <PageHeader
+        breadcrumbs={[homeCrumb(user.role), { label: title }]}
         title={title}
-        description={user.role === 'JUDGE' ? 'Your board.' : user.role === 'LAWYER' ? 'Listings in the cases you appear in.' : 'Listings across all courtrooms.'}
+        description={
+          user.role === 'JUDGE'
+            ? 'Matters listed before you, by day and courtroom.'
+            : user.role === 'LAWYER'
+              ? 'Listings in the matters you appear in.'
+              : 'Daily cause lists across all courtrooms.'
+        }
         actions={
-          <Button asChild>
-            <Link to="/calendar">
-              <CalendarDays />
-              Calendar view
-            </Link>
-          </Button>
+          <>
+            {range === 'today' && hearings.length > 0 && (
+              <Button onClick={() => window.print()}>
+                <Printer />
+                Print cause list
+              </Button>
+            )}
+            <Button asChild>
+              <Link to="/calendar">
+                <CalendarDays />
+                Calendar view
+              </Link>
+            </Button>
+          </>
         }
       />
 
-      <div className="mb-4 flex gap-1 overflow-x-auto border-b border-line" role="tablist" aria-label="Period">
-        {ranges.map((r) => (
-          <button
-            key={r.key}
-            type="button"
-            role="tab"
-            aria-selected={range === r.key}
-            onClick={() => selectRange(r.key)}
-            className={cn(
-              '-mb-px h-10 border-b-2 px-3 text-sm font-medium whitespace-nowrap transition-colors',
-              range === r.key ? 'border-ink text-ink' : 'border-transparent text-muted hover:text-ink',
-            )}
-          >
-            {r.label}
-          </button>
-        ))}
-      </div>
+      <SegmentedTabs
+        label="Period"
+        className="no-print mb-4"
+        value={range}
+        onChange={selectRange}
+        options={ranges.map((r) => ({ value: r.key, label: r.label, count: rangeCounts.counts.get(r.key) }))}
+      />
 
-      <div className="rounded-lg border border-line bg-surface">
-        <div className="flex flex-wrap items-center gap-2 border-b border-line p-3 sm:p-4">
-          <div className="relative min-w-56 flex-1">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" aria-hidden="true" />
-            <Input
+      <p className="mb-3 hidden font-serif text-xl print:block">Cause list for {formatDate(new Date())}</p>
+
+      <ListSheet
+        className="print-plain"
+        toolbar={
+          <FilterBar className="no-print">
+            <SearchInput
               value={search}
-              onChange={(e) => {
-                setSearch(e.target.value)
+              onChange={(value) => {
+                setSearch(value)
                 setPage(0)
               }}
               placeholder="Case number or title"
-              aria-label="Search hearings"
-              className="pl-9"
+              label="Search hearings"
+              className="min-w-56"
             />
-          </div>
-          {range !== 'pending' && range !== 'week' && range !== 'upcoming' && (
-            <MultiSelect label="Status" options={options(hearingStatusLabels)} value={statuses} onChange={(v) => { setStatuses(v); setPage(0) }} />
-          )}
-          <MultiSelect label="Type" options={options(hearingTypeLabels)} value={types} onChange={(v) => { setTypes(v); setPage(0) }} />
-          {judges && (
-            <Select value={judgeId} onChange={(e) => { setJudgeId(e.target.value); setPage(0) }} aria-label="Filter by judge" className="w-48">
-              <option value="">Any judge</option>
-              {judges.map((j) => (
-                <option key={j.id} value={j.id}>
-                  {j.fullName}
-                </option>
-              ))}
-            </Select>
-          )}
-          <Select value={courtroomId} onChange={(e) => { setCourtroomId(e.target.value); setPage(0) }} aria-label="Filter by courtroom" className="w-52">
-            <option value="">Any courtroom</option>
-            {courts?.map((court) => (
-              <optgroup key={court.id} label={court.name}>
-                {court.courtrooms.map((room) => (
-                  <option key={room.id} value={room.id}>
-                    {room.name}
+            {range !== 'pending' && range !== 'week' && range !== 'upcoming' && (
+              <MultiSelect
+                label="Status"
+                options={options(hearingStatusLabels)}
+                value={statuses}
+                onChange={(v) => {
+                  setStatuses(v)
+                  setPage(0)
+                }}
+              />
+            )}
+            <MultiSelect
+              label="Type"
+              options={options(hearingTypeLabels)}
+              value={types}
+              onChange={(v) => {
+                setTypes(v)
+                setPage(0)
+              }}
+            />
+            {judges && (
+              <Select
+                value={judgeId}
+                onChange={(e) => {
+                  setJudgeId(e.target.value)
+                  setPage(0)
+                }}
+                aria-label="Filter by judge"
+                className="w-48"
+              >
+                <option value="">Any judge</option>
+                {judges.map((j) => (
+                  <option key={j.id} value={j.id}>
+                    {j.fullName}
                   </option>
                 ))}
-              </optgroup>
-            ))}
-          </Select>
-        </div>
-
+              </Select>
+            )}
+            <Select
+              value={courtroomId}
+              onChange={(e) => {
+                setCourtroomId(e.target.value)
+                setPage(0)
+              }}
+              aria-label="Filter by courtroom"
+              className="w-52"
+            >
+              <option value="">Any courtroom</option>
+              {courts?.map((court) => (
+                <optgroup key={court.id} label={court.name}>
+                  {court.courtrooms.map((room) => (
+                    <option key={room.id} value={room.id}>
+                      {room.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </Select>
+          </FilterBar>
+        }
+      >
         {isLoading && <SkeletonRows rows={6} />}
         {error && <ErrorState error={error} onRetry={() => refetch()} />}
         {data && hearings.length === 0 && (
           <EmptyState
             icon={Gavel}
-            title={range === 'today' ? 'No matters are listed for today' : range === 'pending' ? 'Every held hearing has an outcome' : 'No hearings in this period'}
+            title={
+              range === 'today'
+                ? 'No matters are listed for today'
+                : range === 'pending'
+                  ? 'Every held hearing has an outcome'
+                  : 'No hearings in this period'
+            }
             description={range === 'today' ? 'Check the next 7 days or the calendar.' : undefined}
           />
         )}
@@ -181,7 +235,7 @@ export default function HearingsPage() {
             {range !== 'today' && <Pagination page={data} onChange={setPage} noun="hearings" />}
           </div>
         )}
-      </div>
+      </ListSheet>
     </>
   )
 }
@@ -196,7 +250,7 @@ function DayGroups({ hearings }: { hearings: Hearing[] }) {
     <div>
       {[...days.entries()].map(([day, items]) => (
         <section key={day} aria-label={formatWeekday(day)}>
-          <h2 className="flex items-baseline gap-2 border-b border-line bg-paper/70 px-4 py-2 text-[13px] font-semibold text-ink">
+          <h2 className="flex items-baseline gap-2 border-b border-line bg-ivory px-4 py-2 text-[13px] font-semibold text-ink sm:px-5">
             {formatWeekday(day)}
             <span className="font-normal text-muted">{relativeDay(day)}</span>
           </h2>
@@ -205,7 +259,7 @@ function DayGroups({ hearings }: { hearings: Hearing[] }) {
               <li key={hearing.id}>
                 <Link
                   to={`/cases/${hearing.courtCase.id}?tab=hearings`}
-                  className="grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-3 px-4 py-3 transition-colors hover:bg-paper sm:grid-cols-[3.5rem_minmax(0,1fr)_12rem_auto]"
+                  className="grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-3 px-4 py-3 transition-colors hover:bg-ivory sm:grid-cols-[3.5rem_minmax(0,1fr)_12rem_auto] sm:px-5"
                 >
                   <span className="tabular pt-0.5 text-sm font-semibold text-ink">{formatTime(hearing.scheduledAt)}</span>
                   <span className="min-w-0">
@@ -213,7 +267,13 @@ function DayGroups({ hearings }: { hearings: Hearing[] }) {
                     <CaseTitle title={hearing.courtCase.title} className="block truncate text-[15px] text-ink" />
                     <span className="block truncate text-xs text-muted">
                       {hearingTypeLabels[hearing.hearingType]}
-                      {hearing.status === 'SCHEDULED' ? (hearing.purpose ? `: ${hearing.purpose}` : '') : hearing.outcome ? `: ${hearing.outcome}` : ''}
+                      {hearing.status === 'SCHEDULED'
+                        ? hearing.purpose
+                          ? `: ${hearing.purpose}`
+                          : ''
+                        : hearing.outcome
+                          ? `: ${hearing.outcome}`
+                          : ''}
                     </span>
                   </span>
                   <span className="col-start-2 text-xs text-muted sm:col-start-auto sm:pt-1">

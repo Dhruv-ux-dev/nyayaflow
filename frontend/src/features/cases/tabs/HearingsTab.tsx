@@ -8,9 +8,10 @@ import { Menu, MenuItem } from '@/components/ui/menu'
 import { Panel } from '@/components/ui/panel'
 import { formatTime, formatWeekday, relativeDay, todayIso } from '@/lib/format'
 import { hearingTypeLabels } from '@/lib/labels'
-import type { CaseDetail, Hearing } from '@/lib/types'
+import type { CaseDetail, Hearing, Proceeding } from '@/lib/types'
 
 import { useOpenCaseDialog } from '../caseDialogContext'
+import { ProceedingsTab } from './ProceedingsTab'
 
 /** Outcome, reschedule and cancel actions for a scheduled hearing, gated by the case permissions. */
 export function HearingActions({ courtCase, hearing }: { courtCase: CaseDetail; hearing: Hearing }) {
@@ -20,7 +21,7 @@ export function HearingActions({ courtCase, hearing }: { courtCase: CaseDetail; 
   return (
     <div className="flex items-center gap-1.5">
       {held && (
-        <Button size="sm" variant={hearing.outcomePending ? 'primary' : 'secondary'} onClick={() => open({ kind: 'conclude', hearing })}>
+        <Button size="sm" variant={hearing.outcomePending ? 'role' : 'secondary'} onClick={() => open({ kind: 'conclude', hearing })}>
           <ClipboardCheck />
           Record outcome
         </Button>
@@ -46,10 +47,9 @@ export function HearingActions({ courtCase, hearing }: { courtCase: CaseDetail; 
 }
 
 function HearingRow({ courtCase, hearing }: { courtCase: CaseDetail; hearing: Hearing }) {
-  const detail =
-    hearing.status === 'SCHEDULED' ? hearing.purpose : hearing.status === 'CANCELLED' ? hearing.statusReason : hearing.outcome
+  const detail = hearing.status === 'SCHEDULED' ? hearing.purpose : hearing.status === 'CANCELLED' ? hearing.statusReason : hearing.outcome
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)] gap-x-4 gap-y-2 px-4 py-3.5 sm:grid-cols-[8.5rem_minmax(0,1fr)_auto]">
+    <li className="grid grid-cols-[minmax(0,1fr)] gap-x-4 gap-y-2 px-5 py-3.5 sm:grid-cols-[8.5rem_minmax(0,1fr)_auto]">
       <div>
         <p className="text-sm font-semibold text-ink">{formatWeekday(hearing.scheduledAt)}</p>
         <p className="tabular text-xs text-muted">
@@ -75,7 +75,15 @@ function HearingRow({ courtCase, hearing }: { courtCase: CaseDetail; hearing: He
   )
 }
 
-export function HearingsTab({ courtCase, query }: { courtCase: CaseDetail; query: UseQueryResult<Hearing[]> }) {
+export function HearingsTab({
+  courtCase,
+  query,
+  proceedings,
+}: {
+  courtCase: CaseDetail
+  query: UseQueryResult<Hearing[]>
+  proceedings: UseQueryResult<Proceeding[]>
+}) {
   const open = useOpenCaseDialog()
   if (query.isLoading) return <SkeletonRows />
   if (query.error) return <ErrorState error={query.error} onRetry={() => query.refetch()} />
@@ -83,7 +91,7 @@ export function HearingsTab({ courtCase, query }: { courtCase: CaseDetail; query
   const upcoming = hearings.filter((h) => h.status === 'SCHEDULED')
   const past = hearings.filter((h) => h.status !== 'SCHEDULED').reverse()
   const scheduleButton = courtCase.permissions.canScheduleHearing && (
-    <Button size="sm" variant="primary" onClick={() => open({ kind: 'schedule' })}>
+    <Button size="sm" variant="role" onClick={() => open({ kind: 'schedule' })}>
       <CalendarPlus />
       Schedule hearing
     </Button>
@@ -91,19 +99,24 @@ export function HearingsTab({ courtCase, query }: { courtCase: CaseDetail; query
 
   if (hearings.length === 0) {
     return (
-      <Panel title="Hearings">
-        <EmptyState
-          icon={Gavel}
-          title="No hearings yet"
-          description={courtCase.judge ? 'List the first hearing to put this case on the board.' : 'Allocate the case to a judge, then list its first hearing.'}
-          action={scheduleButton}
-        />
-      </Panel>
+      <div className="space-y-6">
+        <Panel title="Hearings">
+          <EmptyState
+            icon={Gavel}
+            title="No hearings yet"
+            description={
+              courtCase.judge ? 'List the first hearing to put this case on the board.' : 'Allocate the case to a judge, then list its first hearing.'
+            }
+            action={scheduleButton}
+          />
+        </Panel>
+        <ProceedingsTab courtCase={courtCase} query={proceedings} />
+      </div>
     )
   }
   return (
     <div className="space-y-6">
-      <Panel title="Listed" description={upcoming.length ? undefined : 'Nothing is listed.'} actions={scheduleButton}>
+      <Panel title="Upcoming listings" description={upcoming.length ? `${upcoming.length} scheduled` : 'Nothing is listed.'} actions={scheduleButton}>
         {upcoming.length > 0 && (
           <ul className="divide-y divide-line">
             {upcoming.map((hearing) => (
@@ -113,7 +126,7 @@ export function HearingsTab({ courtCase, query }: { courtCase: CaseDetail; query
         )}
       </Panel>
       {past.length > 0 && (
-        <Panel title="Held and cancelled" description={`${past.length} earlier listing${past.length === 1 ? '' : 's'}, most recent first`}>
+        <Panel title="Hearing history" description={`${past.length} earlier listing${past.length === 1 ? '' : 's'}, most recent first`}>
           <ul className="divide-y divide-line">
             {past.map((hearing) => (
               <HearingRow key={hearing.id} courtCase={courtCase} hearing={hearing} />
@@ -121,6 +134,7 @@ export function HearingsTab({ courtCase, query }: { courtCase: CaseDetail; query
           </ul>
         </Panel>
       )}
+      <ProceedingsTab courtCase={courtCase} query={proceedings} />
     </div>
   )
 }

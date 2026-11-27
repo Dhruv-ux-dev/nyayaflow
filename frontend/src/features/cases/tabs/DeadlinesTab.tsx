@@ -17,7 +17,7 @@ export function DeadlinesTab({ courtCase, query }: { courtCase: CaseDetail; quer
   const pending = deadlines.filter((d) => d.status !== 'COMPLETED')
   const completed = deadlines.filter((d) => d.status === 'COMPLETED')
   const add = courtCase.permissions.canManageDeadlines && (
-    <Button size="sm" variant="primary" onClick={() => open({ kind: 'deadline' })}>
+    <Button size="sm" variant="role" onClick={() => open({ kind: 'deadline' })}>
       <ListPlus />
       Add deadline
     </Button>

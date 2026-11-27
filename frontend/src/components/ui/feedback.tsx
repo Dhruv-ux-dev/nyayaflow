@@ -22,7 +22,7 @@ export function FullPageSpinner() {
 }
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={cn('animate-pulse rounded-md bg-sunken', className)} aria-hidden="true" />
+  return <div className={cn('animate-pulse rounded-md bg-sunken/90', className)} aria-hidden="true" />
 }
 
 /** Placeholder rows while a list loads. */
@@ -42,21 +42,27 @@ export function EmptyState({
   description,
   action,
   className,
+  compact = false,
 }: {
   icon?: LucideIcon
   title: string
   description?: ReactNode
   action?: ReactNode
   className?: string
+  /** Smaller variant for dashboard panels. */
+  compact?: boolean
 }) {
   return (
-    <div className={cn('flex flex-col items-center px-6 py-12 text-center', className)}>
+    <div className={cn('flex flex-col items-center text-center', compact ? 'px-5 py-8' : 'px-6 py-14', className)}>
       {Icon && (
-        <div className="mb-3 grid size-10 place-items-center rounded-full bg-sunken text-muted">
-          <Icon className="size-5" aria-hidden="true" />
+        <div className={cn('relative mb-4 grid place-items-center', compact ? 'size-11' : 'size-14')}>
+          <span className="absolute inset-0 rounded-full border border-dashed border-line-strong" aria-hidden="true" />
+          <span className={cn('grid place-items-center rounded-full bg-sunken text-muted', compact ? 'size-8' : 'size-10')}>
+            <Icon className={compact ? 'size-4' : 'size-5'} aria-hidden="true" />
+          </span>
         </div>
       )}
-      <p className="font-medium text-ink">{title}</p>
+      <p className={cn('font-medium text-ink', !compact && 'font-serif text-[1.15rem]')}>{title}</p>
       {description && <p className="mt-1 max-w-sm text-sm text-muted">{description}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>

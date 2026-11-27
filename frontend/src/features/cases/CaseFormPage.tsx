@@ -1,10 +1,12 @@
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useFieldArray, useForm, useWatch } from 'react-hook-form'
 import { Link, useNavigate, useParams } from 'react-router'
 
 import { useCourts, useDirectory } from '@/api/admin'
 import { useCase, useCreateCase, useUpdateCase, type CreateCaseInput } from '@/api/cases'
+import { useCurrentUser } from '@/auth/AuthContext'
+import { homeCrumb, pageLabel } from '@/components/layout/navigation'
 import { Button } from '@/components/ui/button'
 import { ErrorState, InlineAlert, SkeletonRows } from '@/components/ui/feedback'
 import { Checkbox, Field, Input, Select, Textarea } from '@/components/ui/form'
@@ -55,7 +57,18 @@ export default function CaseFormPage() {
   return <CaseFormBody />
 }
 
+/** Numbered section heading for the long registration form. */
+function Step({ n, children }: { n: number; children: string }) {
+  return (
+    <span className="flex items-center gap-2.5">
+      <span className="tabular grid size-6 place-items-center rounded-full bg-role text-xs font-semibold text-white">{n}</span>
+      {children}
+    </span>
+  )
+}
+
 function CaseFormBody({ existing }: { existing?: CaseDetail }) {
+  const user = useCurrentUser()
   const editing = Boolean(existing)
   useDocumentTitle(editing ? `Edit ${existing?.caseNumber}` : 'Register case')
   const navigate = useNavigate()
@@ -164,11 +177,14 @@ function CaseFormBody({ existing }: { existing?: CaseDetail }) {
   const back = existing ? `/cases/${existing.id}` : '/cases'
   return (
     <form onSubmit={submit} noValidate className="mx-auto max-w-4xl">
-      <Link to={back} className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink">
-        <ArrowLeft className="size-4" aria-hidden="true" />
-        {existing ? existing.caseNumber : 'Cases'}
-      </Link>
       <PageHeader
+        breadcrumbs={[
+          homeCrumb(user.role),
+          { label: pageLabel(user.role, '/cases', 'Cases'), to: '/cases' },
+          ...(existing ? [{ label: existing.caseNumber, to: `/cases/${existing.id}` }] : []),
+          { label: editing ? 'Edit' : 'Register case' },
+        ]}
+        eyebrow={editing ? existing?.caseNumber : 'New filing'}
         title={editing ? 'Edit case details' : 'Register a case'}
         description={
           editing
@@ -183,7 +199,7 @@ function CaseFormBody({ existing }: { existing?: CaseDetail }) {
       )}
 
       <div className="space-y-6">
-        <Panel title="Case" bodyClassName="grid gap-4 p-4 sm:grid-cols-2">
+        <Panel title={<Step n={1}>Case</Step>} bodyClassName="grid gap-4 p-5 sm:grid-cols-2">
           <Field label="Case type" required>
             {(field) => (
               <Select {...field} disabled={editing} {...register('caseType')}>
@@ -218,7 +234,7 @@ function CaseFormBody({ existing }: { existing?: CaseDetail }) {
           </Field>
         </Panel>
 
-        <Panel title="Court" bodyClassName="grid gap-4 p-4 sm:grid-cols-2">
+        <Panel title={<Step n={2}>Court and allocation</Step>} bodyClassName="grid gap-4 p-5 sm:grid-cols-2">
           <Field label="Court" required error={errors.courtId?.message}>
             {(field) => (
               <Select {...field} disabled={editing} {...register('courtId', { required: 'Choose a court' })}>
@@ -264,7 +280,7 @@ function CaseFormBody({ existing }: { existing?: CaseDetail }) {
         </Panel>
 
         <Panel
-          title="Parties"
+          title={<Step n={3}>Parties</Step>}
           description={`At least one ${labels.PETITIONER.toLowerCase()} and one ${labels.RESPONDENT.toLowerCase()}.`}
           bodyClassName="divide-y divide-line"
         >
@@ -280,7 +296,7 @@ function CaseFormBody({ existing }: { existing?: CaseDetail }) {
               <div className="space-y-3">
                 {parties.fields.map((party, index) =>
                   party.side !== side ? null : (
-                    <div key={party.id} className="grid gap-3 rounded-md border border-line bg-paper/50 p-3 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_auto]">
+                    <div key={party.id} className="grid gap-3 rounded-lg border border-line bg-ivory/70 p-3 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_auto]">
                       <Field label="Name" required error={errors.parties?.[index]?.name?.message}>
                         {(field) => <Input {...field} {...register(`parties.${index}.name`, requiredText('Enter the party’s name'))} />}
                       </Field>
@@ -319,7 +335,7 @@ function CaseFormBody({ existing }: { existing?: CaseDetail }) {
 
         {!editing && (
           <Panel
-            title="Counsel"
+            title={<Step n={4}>Counsel</Step>}
             description="Lawyers appearing in the case. They will see the case and be notified of hearings and orders."
             actions={
               <Button size="sm" variant="ghost" onClick={() => counsel.append({ lawyerId: '', side: 'PETITIONER', leadCounsel: counsel.fields.length === 0 })}>
@@ -365,11 +381,12 @@ function CaseFormBody({ existing }: { existing?: CaseDetail }) {
         )}
       </div>
 
-      <div className="sticky bottom-0 mt-6 flex justify-end gap-2 border-t border-line bg-paper/95 py-4 backdrop-blur">
+      <div className="sticky bottom-0 mt-6 flex flex-wrap items-center justify-end gap-2 border-t border-line bg-paper/95 py-4 backdrop-blur">
+        <p className="mr-auto hidden text-xs text-muted sm:block">{editing ? 'Changes are recorded in the case activity.' : 'Fields marked * are required.'}</p>
         <Button asChild variant="ghost">
           <Link to={back}>Cancel</Link>
         </Button>
-        <Button type="submit" variant="primary" loading={isSubmitting}>
+        <Button type="submit" variant="role" loading={isSubmitting}>
           {editing ? 'Save changes' : 'Register case'}
         </Button>
       </div>

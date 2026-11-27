@@ -77,8 +77,8 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
           <div id="command-results" role="listbox" className="max-h-[60vh] overflow-y-auto p-2">
             {!term && (
               <p className="px-3 py-6 text-center text-sm text-muted">
-                Try <span className="font-medium text-ink-soft">CS/2</span>, <span className="font-medium text-ink-soft">Sharma</span> or a
-                lawyer’s name.
+                Try <span className="font-medium text-ink-soft">CS/2</span>, <span className="font-medium text-ink-soft">Sharma</span> or a lawyer’s
+                name.
               </p>
             )}
             {results.map((item, index) => (
@@ -99,9 +99,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                 <CaseStatusBadge status={item.status} />
               </button>
             ))}
-            {term && !isFetching && results.length === 0 && (
-              <p className="px-3 py-6 text-center text-sm text-muted">No cases match “{term}”.</p>
-            )}
+            {term && !isFetching && results.length === 0 && <p className="px-3 py-6 text-center text-sm text-muted">No cases match “{term}”.</p>}
             {term && (
               <button
                 type="button"
