@@ -20,7 +20,7 @@ export function OrdersTab({ courtCase, query }: { courtCase: CaseDetail; query: 
   if (query.error) return <ErrorState error={query.error} onRetry={() => query.refetch()} />
   const orders = query.data ?? []
   const issue = courtCase.permissions.canIssueOrder && (
-    <Button size="sm" variant="primary" onClick={() => open({ kind: 'order' })}>
+    <Button size="sm" variant="role" onClick={() => open({ kind: 'order' })}>
       <Gavel />
       Issue order
     </Button>

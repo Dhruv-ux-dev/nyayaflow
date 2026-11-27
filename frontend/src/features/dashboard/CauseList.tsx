@@ -1,3 +1,4 @@
+import { DoorOpen } from 'lucide-react'
 import { Link } from 'react-router'
 
 import { HearingStatusBadge } from '@/components/domain/badges'
@@ -19,9 +20,15 @@ export function CauseList({ hearings, showJudge = true }: { hearings: Hearing[];
   return (
     <div className="divide-y divide-line">
       {[...rooms.entries()].map(([room, items]) => (
-        <div key={room}>
-          <div className="flex items-baseline justify-between gap-3 bg-paper/70 px-4 py-2">
-            <p className="text-[13px] font-semibold text-ink">{room}</p>
+        <div key={room} className="break-inside-avoid">
+          <div className="flex items-center justify-between gap-3 bg-ivory px-4 py-2 sm:px-5">
+            <p className="flex items-center gap-2 text-[13px] font-semibold text-ink">
+              <DoorOpen className="size-3.5 text-muted" aria-hidden="true" />
+              {room}
+              <span className="font-normal text-muted">
+                · {items.length} matter{items.length === 1 ? '' : 's'}
+              </span>
+            </p>
             {showJudge && items[0].judge && <p className="truncate text-xs text-muted">Before {items[0].judge.fullName}</p>}
           </div>
           <ol>
@@ -29,7 +36,7 @@ export function CauseList({ hearings, showJudge = true }: { hearings: Hearing[];
               <li key={hearing.id} className="border-t border-line first:border-t-0">
                 <Link
                   to={`/cases/${hearing.courtCase.id}?tab=hearings`}
-                  className="grid grid-cols-[2rem_3.25rem_minmax(0,1fr)] items-start gap-x-3 px-4 py-3 transition-colors hover:bg-paper sm:grid-cols-[2rem_3.25rem_minmax(0,1fr)_auto]"
+                  className="grid grid-cols-[1.75rem_3.25rem_minmax(0,1fr)] items-start gap-x-3 px-4 py-3 transition-colors hover:bg-ivory sm:grid-cols-[1.75rem_3.25rem_minmax(0,1fr)_auto] sm:px-5"
                 >
                   <span className="tabular pt-0.5 text-sm text-faint">{index + 1}.</span>
                   <span className="tabular pt-0.5 text-sm font-semibold text-ink">{formatTime(hearing.scheduledAt)}</span>

@@ -1,289 +1,193 @@
-import { CalendarPlus, Mail, Phone, UserRoundX } from 'lucide-react'
-import { useState } from 'react'
-import { Link } from 'react-router'
+import { ArrowRight, FileText, Scale } from 'lucide-react'
 
-import { useRemoveLawyer } from '@/api/cases'
-import { DueLabel, HearingStatusBadge } from '@/components/domain/badges'
-import { PersonLine } from '@/components/domain/PersonLine'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { ConfirmDialog } from '@/components/ui/dialog'
-import { Tooltip } from '@/components/ui/menu'
-import { Detail, Panel } from '@/components/ui/panel'
+import { useCaseTimeline } from '@/api/cases'
+import { HearingStatusBadge } from '@/components/domain/badges'
+import { Panel } from '@/components/ui/panel'
+import { Skeleton } from '@/components/ui/feedback'
+import { cn } from '@/lib/cn'
 import { formatDate, formatTime, relativeDay, timeAgo } from '@/lib/format'
-import { caseTypeLabels, hearingTypeLabels, orderTypeLabels, partyTypeLabels, sideLabels } from '@/lib/labels'
-import type { CaseDetail, CaseLawyer, CourtOrder, Deadline, Hearing, PartySide } from '@/lib/types'
+import { caseStatusLabels, documentTypeLabels, hearingTypeLabels, partyTypeLabels, sideLabels } from '@/lib/labels'
+import type { CaseDetail, CaseDocument, CaseStatus, CourtOrder, Hearing, PartySide } from '@/lib/types'
 
-import { useOpenCaseDialog } from '../caseDialogContext'
-import { HearingActions } from './HearingsTab'
+function TabButton({ tab, onTab, children }: { tab: string; onTab: (tab: string) => void; children: string }) {
+  return (
+    <button type="button" onClick={() => onTab(tab)} className="inline-flex items-center gap-1 text-[13px] font-medium text-brand hover:underline">
+      {children}
+      <ArrowRight className="size-3.5" aria-hidden="true" />
+    </button>
+  )
+}
 
+/** The case in one view: what it is about, who is on each side, where it stands and what happened lately. */
 export function OverviewTab({
   courtCase,
   hearings,
-  deadlines,
+  documents,
   orders,
+  onTab,
 }: {
   courtCase: CaseDetail
   hearings?: Hearing[]
-  deadlines?: Deadline[]
+  documents?: CaseDocument[]
   orders?: CourtOrder[]
+  onTab: (tab: string) => void
 }) {
-  const next = hearings?.filter((h) => h.status === 'SCHEDULED').sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))[0]
-  const openDeadlines = (deadlines ?? []).filter((d) => d.status !== 'COMPLETED')
-  const latestOrder = orders?.[orders.length - 1]
+  const labels = sideLabels[courtCase.caseType]
+  const held = (hearings ?? []).filter((h) => h.status === 'COMPLETED' || h.status === 'ADJOURNED')
+  const lastHeld = held[held.length - 1]
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="min-w-0 space-y-6">
-        <NextHearing courtCase={courtCase} hearing={next} />
-        {courtCase.description && (
-          <Panel title="The matter">
-            <p className="max-w-[72ch] px-4 py-4 font-serif text-[16px] leading-relaxed text-ink-soft">{courtCase.description}</p>
-          </Panel>
-        )}
-        <Parties courtCase={courtCase} />
-        <Counsel courtCase={courtCase} />
-      </div>
-      <div className="min-w-0 space-y-6">
-        <Panel title="Case details">
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-4 px-4 py-4">
-            <Detail label="Case number">{courtCase.caseNumber}</Detail>
-            <Detail label="Type">{caseTypeLabels[courtCase.caseType]}</Detail>
-            <Detail label="Filed on">{formatDate(courtCase.filingDate)}</Detail>
-            <Detail label="Courtroom">{courtCase.courtroom?.name ?? 'Not decided'}</Detail>
-            <Detail label="Court" className="col-span-2">
-              {courtCase.court.name}
-            </Detail>
-            <Detail label="Presiding judge" className="col-span-2">
-              <span className="flex items-center justify-between gap-2">
-                <PersonLine person={courtCase.judge} fallback="Awaiting allocation" />
-                {courtCase.permissions.canAssignJudge && <AllocateButton reassign={Boolean(courtCase.judge)} />}
-              </span>
-            </Detail>
-            {courtCase.disposedOn && <Detail label="Disposed on">{formatDate(courtCase.disposedOn)}</Detail>}
-            {courtCase.closedOn && <Detail label="Closed on">{formatDate(courtCase.closedOn)}</Detail>}
-            <Detail label="Registered by">{courtCase.createdBy?.fullName ?? '—'}</Detail>
-            <Detail label="Last activity">{timeAgo(courtCase.updatedAt)}</Detail>
+    <div className="space-y-6">
+      <Panel title="The matter" icon={<Scale />}>
+        <div className="px-5 py-4">
+          {courtCase.description ? (
+            <p className="max-w-[72ch] font-serif text-[16.5px] leading-relaxed text-ink-soft">{courtCase.description}</p>
+          ) : (
+            <p className="text-sm text-muted">No summary of the matter was recorded at registration.</p>
+          )}
+        </div>
+        <div className="grid border-t border-line sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+          {(['PETITIONER', 'RESPONDENT'] as PartySide[]).map((side, index) => (
+            <div key={side} className={cn('px-5 py-4', index === 1 && 'sm:order-3')}>
+              <p className="eyebrow text-faint">{labels[side]}</p>
+              <ul className="mt-1.5 space-y-1.5">
+                {courtCase.parties
+                  .filter((party) => party.side === side)
+                  .map((party) => (
+                    <li key={party.id}>
+                      <p className="font-serif text-[16px] leading-snug text-ink">{party.name}</p>
+                      <p className="text-xs text-muted">{partyTypeLabels[party.partyType]}</p>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          ))}
+          <div className="hidden items-center justify-center border-x border-line px-4 sm:order-2 sm:flex" aria-hidden="true">
+            <span className="font-serif text-lg text-faint italic">v.</span>
+          </div>
+        </div>
+        <div className="flex justify-end border-t border-line px-5 py-2.5">
+          <TabButton tab="parties" onTab={onTab}>
+            Parties and counsel
+          </TabButton>
+        </div>
+      </Panel>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Panel
+          title="Hearing record"
+          actions={
+            <TabButton tab="hearings" onTab={onTab}>
+              All hearings
+            </TabButton>
+          }
+        >
+          <dl className="grid grid-cols-3 gap-px border-b border-line bg-line text-center">
+            {[
+              { label: 'Listed', value: hearings?.length },
+              { label: 'Held', value: held.length },
+              { label: 'Adjourned', value: hearings?.filter((h) => h.status === 'ADJOURNED').length },
+            ].map((item) => (
+              <div key={item.label} className="bg-surface px-3 py-3">
+                <dt className="text-xs text-muted">{item.label}</dt>
+                <dd className="tabular text-xl font-semibold text-ink">{item.value ?? '–'}</dd>
+              </div>
+            ))}
           </dl>
+          {lastHeld ? (
+            <div className="px-5 py-4">
+              <p className="flex flex-wrap items-center gap-2 text-xs text-muted">
+                Last heard {formatDate(lastHeld.scheduledAt)} at {formatTime(lastHeld.scheduledAt)}
+                <HearingStatusBadge status={lastHeld.status} />
+              </p>
+              <p className="mt-1 text-sm font-medium text-ink">{hearingTypeLabels[lastHeld.hearingType]}</p>
+              {lastHeld.outcome && <p className="mt-1 text-[13px] text-ink-soft">{lastHeld.outcome}</p>}
+            </div>
+          ) : (
+            <p className="px-5 py-4 text-sm text-muted">No hearing has been held yet.</p>
+          )}
         </Panel>
 
-        <Panel title="Open deadlines" actions={<TabLink tab="deadlines">All deadlines</TabLink>}>
-          {openDeadlines.length === 0 ? (
-            <p className="px-4 py-4 text-sm text-muted">Nothing is due in this case.</p>
+        <Panel
+          title="Recent documents"
+          actions={
+            <TabButton tab="documents" onTab={onTab}>
+              Case file
+            </TabButton>
+          }
+        >
+          {!documents ? (
+            <Skeleton className="m-5 h-24" />
+          ) : documents.length === 0 ? (
+            <p className="px-5 py-4 text-sm text-muted">The case file is empty.</p>
           ) : (
             <ul className="divide-y divide-line">
-              {openDeadlines.slice(0, 5).map((deadline) => (
-                <li key={deadline.id} className="px-4 py-3">
-                  <span className="flex items-start justify-between gap-3">
-                    <span className="text-sm font-medium text-ink">{deadline.title}</span>
-                    <DueLabel days={deadline.daysUntilDue} status={deadline.status} className="shrink-0 pt-0.5" />
+              {documents.slice(0, 4).map((doc) => (
+                <li key={doc.id} className="flex items-center gap-3 px-5 py-2.5">
+                  <FileText className="size-4 shrink-0 text-muted" aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-ink">{doc.title}</span>
+                    <span className="block truncate text-xs text-muted">
+                      {documentTypeLabels[doc.documentType]} · {doc.uploadedBy.fullName}
+                    </span>
                   </span>
-                  <span className="text-xs text-muted">
-                    {deadline.assignedTo?.fullName ?? 'Unassigned'}, due {formatDate(deadline.dueDate)}
-                  </span>
+                  <span className="shrink-0 text-xs text-faint">{timeAgo(doc.updatedAt)}</span>
                 </li>
               ))}
             </ul>
           )}
         </Panel>
-
-        <Panel title="Latest order" actions={<TabLink tab="orders">All orders</TabLink>}>
-          {latestOrder ? (
-            <div className="px-4 py-4">
-              <p className="text-xs text-muted">
-                {orderTypeLabels[latestOrder.orderType]}, {formatDate(latestOrder.orderDate)}
-              </p>
-              <p className="mt-0.5 font-medium text-ink">{latestOrder.title}</p>
-              <p className="mt-2 line-clamp-4 font-serif text-[15px] leading-relaxed text-ink-soft">{latestOrder.content}</p>
-            </div>
-          ) : (
-            <p className="px-4 py-4 text-sm text-muted">No orders have been issued.</p>
-          )}
-        </Panel>
       </div>
+
+      <RecentDevelopments courtCase={courtCase} onTab={onTab} orders={orders?.length ?? 0} />
     </div>
   )
 }
 
-function TabLink({ tab, children }: { tab: string; children: string }) {
-  return (
-    <Link to={`?tab=${tab}`} replace className="text-[13px] font-medium text-brand hover:underline">
-      {children}
-    </Link>
-  )
-}
-
-function AllocateButton({ reassign }: { reassign: boolean }) {
-  const open = useOpenCaseDialog()
-  return (
-    <Button size="sm" variant={reassign ? 'ghost' : 'primary'} onClick={() => open({ kind: 'assign' })}>
-      {reassign ? 'Reassign' : 'Allocate'}
-    </Button>
-  )
-}
-
-function NextHearing({ courtCase, hearing }: { courtCase: CaseDetail; hearing?: Hearing }) {
-  const open = useOpenCaseDialog()
-  if (!hearing) {
-    const reason = !courtCase.judge
-      ? 'Allocate the case to a judge before listing it.'
-      : courtCase.status === 'DISPOSED' || courtCase.status === 'CLOSED'
-        ? 'The case has been decided; no further hearings are listed.'
-        : 'No hearing is listed for this case.'
-    return (
-      <Panel title="Next hearing">
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-5">
-          <p className="text-sm text-muted">{reason}</p>
-          {courtCase.permissions.canScheduleHearing && (
-            <Button variant="primary" size="sm" onClick={() => open({ kind: 'schedule' })}>
-              <CalendarPlus />
-              Schedule hearing
-            </Button>
-          )}
-        </div>
-      </Panel>
-    )
-  }
-  const day = new Date(hearing.scheduledAt)
-  return (
-    <Panel title="Next hearing" actions={<HearingStatusBadge status={hearing.status} outcomePending={hearing.outcomePending} />}>
-      <div className="flex flex-wrap items-start gap-5 px-4 py-4">
-        <div className="w-[76px] shrink-0 overflow-hidden rounded-md border border-line text-center">
-          <p className="bg-seal py-0.5 text-[11px] font-semibold text-white">{day.toLocaleString('en-IN', { month: 'short' })}</p>
-          <p className="py-1 text-[1.9rem] leading-none font-semibold text-ink">{day.getDate()}</p>
-          <p className="pb-1 text-[11px] text-muted">{day.toLocaleString('en-IN', { weekday: 'short' })}</p>
-        </div>
-        <div className="min-w-[13rem] flex-1">
-          <p className="text-lg font-semibold text-ink">
-            {formatTime(hearing.scheduledAt)}
-            <span className="ml-2 text-sm font-normal text-muted">{relativeDay(hearing.scheduledAt)}</span>
-          </p>
-          <p className="text-sm text-ink-soft">
-            {hearingTypeLabels[hearing.hearingType]}
-            {hearing.courtroom ? ` in ${hearing.courtroom.name}` : ''}
-            {hearing.judge ? `, before ${hearing.judge.fullName}` : ''}
-          </p>
-          {hearing.purpose && <p className="mt-1 text-sm text-muted">{hearing.purpose}</p>}
-          {hearing.rescheduleCount > 0 && (
-            <p className="mt-1 text-xs text-warning">
-              Rescheduled {hearing.rescheduleCount === 1 ? 'once' : `${hearing.rescheduleCount} times`}
-              {hearing.statusReason ? `. Last reason: ${hearing.statusReason}` : ''}
-            </p>
-          )}
-        </div>
-        <HearingActions courtCase={courtCase} hearing={hearing} />
-      </div>
-    </Panel>
-  )
-}
-
-function Parties({ courtCase }: { courtCase: CaseDetail }) {
-  const labels = sideLabels[courtCase.caseType]
-  return (
-    <Panel title="Parties">
-      <div className="grid divide-line sm:grid-cols-2 sm:divide-x">
-        {(['PETITIONER', 'RESPONDENT'] as PartySide[]).map((side) => (
-          <div key={side} className="px-4 py-4">
-            <p className="mb-2 text-xs font-medium text-muted">{labels[side]}</p>
-            <ul className="space-y-3">
-              {courtCase.parties
-                .filter((party) => party.side === side)
-                .map((party) => (
-                  <li key={party.id}>
-                    <p className="font-serif text-[16px] leading-snug text-ink">{party.name}</p>
-                    <p className="text-xs text-muted">
-                      {partyTypeLabels[party.partyType]}
-                      {party.address ? `, ${party.address}` : ''}
-                    </p>
-                  </li>
-                ))}
-            </ul>
-          </div>
-        ))}
-      </div>
-    </Panel>
-  )
-}
-
-function Counsel({ courtCase }: { courtCase: CaseDetail }) {
-  const open = useOpenCaseDialog()
-  const remove = useRemoveLawyer(courtCase.id)
-  const [removing, setRemoving] = useState<CaseLawyer | null>(null)
-  const labels = sideLabels[courtCase.caseType]
-  const canManage = courtCase.permissions.canManageLawyers
-
+/** The last few events from the case timeline, newest first. */
+function RecentDevelopments({ courtCase, onTab, orders }: { courtCase: CaseDetail; onTab: (tab: string) => void; orders: number }) {
+  const { data, isLoading } = useCaseTimeline(courtCase.id)
+  const now = new Date()
+  const past = (data ?? [])
+    .filter((entry) => new Date(entry.occurredAt) <= now)
+    .slice(-6)
+    .reverse()
   return (
     <Panel
-      title="Counsel"
+      title="Recent developments"
+      description={`${courtCase.statusHistory.length} status change${courtCase.statusHistory.length === 1 ? '' : 's'} · ${orders} order${orders === 1 ? '' : 's'} on record`}
       actions={
-        canManage && (
-          <Button size="sm" variant="ghost" onClick={() => open({ kind: 'lawyer' })}>
-            Add counsel
-          </Button>
-        )
+        <TabButton tab="timeline" onTab={onTab}>
+          Full timeline
+        </TabButton>
       }
     >
-      {courtCase.lawyers.length === 0 ? (
-        <p className="px-4 py-4 text-sm text-muted">No counsel has entered appearance.</p>
+      {isLoading ? (
+        <Skeleton className="m-5 h-32" />
+      ) : past.length === 0 ? (
+        <p className="px-5 py-4 text-sm text-muted">Nothing has happened in this case yet.</p>
       ) : (
-        <ul className="divide-y divide-line">
-          {courtCase.lawyers.map((lawyer) => (
-            <li key={lawyer.lawyerId} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink">
-                  {lawyer.fullName}
-                  {lawyer.leadCounsel && <Badge tone="seal">Lead counsel</Badge>}
-                </p>
+        <ol className="px-5 py-4">
+          {past.map((entry, index) => (
+            <li key={entry.id} className="relative flex gap-3 pb-4 last:pb-0">
+              {index < past.length - 1 && <span className="absolute top-3 bottom-0 left-[5px] w-px bg-line" aria-hidden="true" />}
+              <span
+                className={cn(
+                  'relative mt-1.5 size-[11px] shrink-0 rounded-full border-2',
+                  entry.milestone ? 'border-role bg-role' : 'border-line-strong bg-surface',
+                )}
+                aria-hidden="true"
+              />
+              <div className="min-w-0">
+                <p className="text-sm text-ink">{entry.kind === 'STATUS' ? `Status: ${caseStatusLabels[entry.tag as CaseStatus]}` : entry.title}</p>
                 <p className="text-xs text-muted">
-                  For the {labels[lawyer.side].toLowerCase()}
-                  {lawyer.barRegistrationNumber ? `, enrolment ${lawyer.barRegistrationNumber}` : ''}
+                  {formatDate(entry.occurredAt)} · {relativeDay(entry.occurredAt)}
+                  {entry.actor ? ` · ${entry.actor}` : ''}
                 </p>
-              </div>
-              <div className="flex items-center gap-1 text-muted">
-                <Tooltip content={lawyer.email}>
-                  <a href={`mailto:${lawyer.email}`} className="grid size-8 place-items-center rounded-md hover:bg-sunken hover:text-ink" aria-label={`Email ${lawyer.fullName}`}>
-                    <Mail className="size-4" />
-                  </a>
-                </Tooltip>
-                {lawyer.phone && (
-                  <Tooltip content={lawyer.phone}>
-                    <a href={`tel:${lawyer.phone.replace(/\s/g, '')}`} className="grid size-8 place-items-center rounded-md hover:bg-sunken hover:text-ink" aria-label={`Call ${lawyer.fullName}`}>
-                      <Phone className="size-4" />
-                    </a>
-                  </Tooltip>
-                )}
-                {canManage && (
-                  <Tooltip content="Remove from case">
-                    <button
-                      type="button"
-                      onClick={() => setRemoving(lawyer)}
-                      className="grid size-8 place-items-center rounded-md hover:bg-danger-soft hover:text-danger"
-                      aria-label={`Remove ${lawyer.fullName}`}
-                    >
-                      <UserRoundX className="size-4" />
-                    </button>
-                  </Tooltip>
-                )}
               </div>
             </li>
           ))}
-        </ul>
-      )}
-      {removing && (
-        <ConfirmDialog
-          open
-          onOpenChange={(value) => !value && setRemoving(null)}
-          title="Remove counsel"
-          description={
-            <>
-              {removing.fullName} will lose access to <span className="font-medium text-ink">{courtCase.caseNumber}</span> and will be notified.
-            </>
-          }
-          confirmLabel="Remove counsel"
-          tone="danger"
-          loading={remove.isPending}
-          onConfirm={() => remove.mutate(removing.lawyerId, { onSuccess: () => setRemoving(null) })}
-        />
+        </ol>
       )}
     </Panel>
   )

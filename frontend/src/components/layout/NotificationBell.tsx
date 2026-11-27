@@ -73,7 +73,10 @@ function NotificationPreview({ onClose }: { onClose: () => void }) {
             key={item.id}
             type="button"
             onClick={() => openItem(item)}
-            className={cn('flex w-full gap-3 border-b border-line px-4 py-3 text-left last:border-b-0 hover:bg-paper', !item.read && 'bg-brand-soft/40')}
+            className={cn(
+              'flex w-full gap-3 border-b border-line px-4 py-3 text-left last:border-b-0 hover:bg-paper',
+              !item.read && 'bg-brand-soft/40',
+            )}
           >
             <span className={cn('mt-1.5 size-2 shrink-0 rounded-full', item.read ? 'bg-transparent' : 'bg-seal')} aria-hidden="true" />
             <span className="min-w-0">
